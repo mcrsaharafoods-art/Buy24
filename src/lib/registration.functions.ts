@@ -33,13 +33,10 @@ export const submitApplication = createServerFn({ method: "POST" })
     // 1. Confirm OTP was verified (Ideally we check otpVerifications in Firestore)
     const otpSnap = await adminDb
       .collection(COLLECTIONS.OTP_VERIFICATIONS)
-      .where("mobile", "==", data.mobile)
-      .where("verified", "==", true)
-      .orderBy("created_at", "desc")
-      .limit(1)
+      .doc(data.mobile)
       .get();
 
-    if (otpSnap.empty) {
+    if (!otpSnap.exists || otpSnap.data()?.verified !== true) {
       throw new Error("Mobile number is not verified. Please verify OTP first.");
     }
 

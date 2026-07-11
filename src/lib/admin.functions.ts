@@ -81,11 +81,24 @@ export const listApplications = createServerFn({ method: "GET" })
     const usersMap = new Map(usersSnap.docs.map((doc: any) => [doc.id, doc.data()]));
 
     return apps.map((app: any) => {
-      const profile = usersMap.get(app.user_id);
+      const profile = usersMap.get(app.user_id) as
+        | { full_name?: string; mobile?: string }
+        | undefined;
+      const submittedAt =
+        typeof app.submitted_at === "string"
+          ? app.submitted_at
+          : typeof app.submitted_at?.toDate === "function"
+            ? app.submitted_at.toDate().toISOString()
+            : null;
+
       return {
-        ...app,
-        full_name: profile?.full_name,
-        mobile: profile?.mobile,
+        id: String(app.id ?? ""),
+        application_code: String(app.application_code ?? ""),
+        shop_name: String(app.shop_name ?? ""),
+        status: String(app.status ?? "pending"),
+        submitted_at: submittedAt,
+        full_name: profile?.full_name ?? "",
+        mobile: profile?.mobile ?? "",
       };
     });
   });

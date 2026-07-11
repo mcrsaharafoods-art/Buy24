@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, XCircle, FileWarning } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, FileWarning, CircleHelp } from "lucide-react";
 
 type Status = "pending" | "approved" | "rejected" | "reupload_required";
 
@@ -35,10 +35,16 @@ export function StatusBadge({
   status,
   size = "md",
 }: {
-  status: Status;
+  status: string;
   size?: "sm" | "md" | "lg";
 }) {
-  const cfg = CONFIG[status];
+  const cfg = CONFIG[status as Status] ?? {
+    label: status
+      ? status.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+      : "Unknown Status",
+    className: "bg-muted text-muted-foreground border-border",
+    icon: CircleHelp,
+  };
   const Icon = cfg.icon;
   return (
     <span

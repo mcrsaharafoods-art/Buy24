@@ -142,10 +142,12 @@ function AdminApplicationsPage() {
                   <TableCell>{r.shop_name}</TableCell>
                   <TableCell>+91 {r.mobile}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {new Date(r.submitted_at).toLocaleDateString()}
+                    {r.submitted_at
+                      ? new Date(r.submitted_at).toLocaleDateString()
+                      : "—"}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={r.status as never} size="sm" />
+                    <StatusBadge status={r.status} size="sm" />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button asChild size="sm" variant="outline">
