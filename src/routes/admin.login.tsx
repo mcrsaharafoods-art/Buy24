@@ -28,6 +28,11 @@ function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log("Auth object before sign-in:", auth);
+      if (!auth) {
+        throw new Error("Firebase Auth is not initialized properly on the client.");
+      }
+
       // Idempotent: creates the fixed super-admin account on first login.
       await bootstrap({});
 

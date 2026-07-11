@@ -34,6 +34,10 @@ function LoginPage() {
       : identifier.trim().toLowerCase();
 
     try {
+      if (!auth) {
+        throw new Error("FIREBASE AUTH FAILED: Auth instance is undefined.");
+      }
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const idToken = await userCredential.user.getIdToken();
       await createAuthSession({ data: { idToken } });

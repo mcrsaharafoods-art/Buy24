@@ -492,7 +492,7 @@ function ProductsSummary({ vendorId }: { vendorId: string }) {
   return (
     <DetailBlock title={`Products Summary (${products.length})`}>
       <div className="col-span-2 space-y-4">
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {}
         {products.map((p: any) => (
           <div key={p.id} className="flex items-center gap-4 rounded-md border p-3">
             {p.images?.[0] ? (

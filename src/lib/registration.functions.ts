@@ -126,9 +126,9 @@ export const submitApplication = createServerFn({ method: "POST" })
       // 7. Upload documents + insert document rows
       for (const [docType, doc] of Object.entries(data.documents)) {
         if (!doc) continue;
-        
-        let finalStoragePath = doc.base64;
-        let finalSizeBytes = 0;
+
+        const finalStoragePath = doc.base64;
+        const finalSizeBytes = 0;
 
         // TEMPORARY: bypass real Firebase Storage if base64/blob.
         // When Firebase Storage is enabled, uncomment the upload logic:

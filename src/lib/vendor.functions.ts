@@ -88,8 +88,8 @@ export const reuploadDocument = createServerFn({ method: "POST" })
       throw new Error(`Document ${data.doc_type} was not requested for re-upload`);
     }
 
-    let finalStoragePath = data.base64;
-    let finalSizeBytes = 0;
+    const finalStoragePath = data.base64;
+    const finalSizeBytes = 0;
 
     // TEMPORARY: bypass real Firebase Storage if base64/blob.
     // When Firebase Storage is enabled, uncomment the upload logic:

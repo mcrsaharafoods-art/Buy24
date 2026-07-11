@@ -838,7 +838,7 @@ function DocSlot({
       toast.error("File size must be less than or equal to 1 MB.");
       return;
     }
-    
+
     // TEMPORARY: Save local preview/reference instead of base64 to bypass missing Firebase Storage
     const localRef = URL.createObjectURL(f);
     onChange({ file_name: f.name, mime_type: f.type, base64: localRef });
@@ -889,7 +889,9 @@ function DocSlot({
         <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed py-6 text-sm text-muted-foreground hover:bg-muted/40">
           <Upload className="mb-1 h-5 w-5" />
           <span>Click to upload</span>
-          <span className="mt-1 text-[11px] text-muted-foreground">Upload image (Maximum size: 1 MB)</span>
+          <span className="mt-1 text-[11px] text-muted-foreground">
+            Upload image (Maximum size: 1 MB)
+          </span>
           <input
             type="file"
             className="hidden"

@@ -1,15 +1,15 @@
-import server from '../dist/server/server.js';
-import { Readable } from 'stream';
+import server from "../dist/server/server.js";
+import { Readable } from "stream";
 
 export default async function handler(req, res) {
   try {
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+    const protocol = req.headers["x-forwarded-proto"] || "http";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
     const url = new URL(req.url, `${protocol}://${host}`);
 
     const headers = new Headers();
     for (const [key, value] of Object.entries(req.headers)) {
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         headers.append(key, value);
       } else if (Array.isArray(value)) {
         value.forEach((v) => headers.append(key, v));
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       headers,
     };
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
+    if (req.method !== "GET" && req.method !== "HEAD") {
       const chunks = [];
       for await (const chunk of req) {
         chunks.push(chunk);
@@ -30,7 +30,9 @@ export default async function handler(req, res) {
     }
 
     const request = new Request(url.toString(), init);
-    const fetchHandler = server.default ? (server.default.fetch || server.default.default?.fetch) : server.fetch;
+    const fetchHandler = server.default
+      ? server.default.fetch || server.default.default?.fetch
+      : server.fetch;
     const response = await fetchHandler(request, process.env, {});
 
     response.headers.forEach((value, key) => {
@@ -60,8 +62,8 @@ export default async function handler(req, res) {
       res.end();
     }
   } catch (error) {
-    console.error('Adapter Error:', error);
+    console.error("Adapter Error:", error);
     res.statusCode = 500;
-    res.end('Internal Server Error');
+    res.end("Internal Server Error");
   }
 }

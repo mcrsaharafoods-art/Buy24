@@ -9,6 +9,7 @@ export default defineConfig({
     tanstackStart({
       server: {
         entry: "server",
+        // @ts-expect-error - Preset is used by Vinxi/Nitro underneath but missing in TanStack Start types
         preset: "vercel",
       },
     }),

@@ -14,26 +14,30 @@ async function assertAdmin(userId: string) {
 export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async () => {
   // Mock bootstrap - create admin user if doesn't exist
   try {
-    const adminEmail = "admin@buy24us.app";
+    const adminEmail = "muneendra2you@gmail.com";
     let user;
     try {
       user = await adminAuth.getUserByEmail(adminEmail);
     } catch {
       user = await adminAuth.createUser({
         email: adminEmail,
-        password: "Buy24Us@Admin#2026",
+        password: "admin@1990",
         displayName: "Super Admin",
       });
+      await adminAuth.setCustomUserClaims(user.uid, { role: "admin", isSuperAdmin: true });
       await adminDb.collection(COLLECTIONS.USERS).doc(user.uid).set({
         id: user.uid,
         email: adminEmail,
         role: "admin",
+        status: "active",
+        isSuperAdmin: true,
         full_name: "Super Admin",
         created_at: new Date().toISOString(),
       });
     }
     return { success: true };
   } catch (e: any) {
+    console.error("BOOTSTRAP ERROR THROWN ON SERVER:", e);
     throw new Error(e.message);
   }
 });

@@ -23,9 +23,9 @@ async function run() {
     "buy24s.firebasestorage.app",
     "buy24us-launchpad.appspot.com",
     "buy24us-launchpad.firebasestorage.app",
-    "buy24s-launchpad.appspot.com"
+    "buy24s-launchpad.appspot.com",
   ];
-  
+
   for (const b of bucketsToTest) {
     await testBucket(b);
   }

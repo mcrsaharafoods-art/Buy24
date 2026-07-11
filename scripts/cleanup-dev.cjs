@@ -13,14 +13,23 @@ const db = getFirestore(app);
 
 async function run() {
   console.log("Cleaning up Firestore test data...");
-  const collections = ["users", "vendorApplications", "vendors", "products", "categories", "settings", "notifications", "applicationDocuments"];
-  
+  const collections = [
+    "users",
+    "vendorApplications",
+    "vendors",
+    "products",
+    "categories",
+    "settings",
+    "notifications",
+    "applicationDocuments",
+  ];
+
   let deletedCount = 0;
   for (const c of collections) {
     const snap = await db.collection(c).where("isTestData", "==", true).get();
     const batch = db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
-    if(snap.size > 0) {
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    if (snap.size > 0) {
       await batch.commit();
       deletedCount += snap.size;
     }
@@ -28,13 +37,19 @@ async function run() {
   console.log(`Deleted ${deletedCount} test documents.`);
 
   console.log("Cleaning up Auth test users...");
-  const testEmails = ["admin@test.com", "vendor-approved@test.com", "vendor-pending@test.com", "vendor-rejected@test.com", "vendor-suspended@test.com"];
+  const testEmails = [
+    "admin@test.com",
+    "vendor-approved@test.com",
+    "vendor-pending@test.com",
+    "vendor-rejected@test.com",
+    "vendor-suspended@test.com",
+  ];
   for (const e of testEmails) {
     try {
       const u = await auth.getUserByEmail(e);
       await auth.deleteUser(u.uid);
       console.log(`Deleted user: ${e}`);
-    } catch(e) {}
+    } catch (e) {}
   }
 
   console.log("Cleaning up static test images...");
@@ -48,4 +63,7 @@ async function run() {
   process.exit(0);
 }
 
-run().catch(e => { console.error(e); process.exit(1); });
+run().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

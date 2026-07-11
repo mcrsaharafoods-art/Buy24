@@ -247,7 +247,9 @@ function ReuploadSlot({ docType, onDone }: { docType: DocType; onDone: () => voi
         >
           <Upload className="mb-1 h-5 w-5" />
           <span>Click to select a new file</span>
-          <span className="mt-1 text-[11px] text-muted-foreground">Upload image (Maximum size: 1 MB)</span>
+          <span className="mt-1 text-[11px] text-muted-foreground">
+            Upload image (Maximum size: 1 MB)
+          </span>
           <input
             type="file"
             className="hidden"

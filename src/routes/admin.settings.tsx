@@ -55,7 +55,7 @@ function AdminSettingsPage() {
       toast.error("File size must be less than or equal to 1 MB.");
       return;
     }
-    
+
     // TEMPORARY: Save local preview/reference to bypass missing Firebase Storage
     const localRef = URL.createObjectURL(f);
     setFavicon({ file: f, base64: localRef });
@@ -142,7 +142,9 @@ function AdminSettingsPage() {
                   onChange={pickFavicon}
                 />
               </label>
-              <span className="mt-1 text-[11px] text-muted-foreground text-center">Upload image (Maximum size: 1 MB)</span>
+              <span className="mt-1 text-[11px] text-muted-foreground text-center">
+                Upload image (Maximum size: 1 MB)
+              </span>
             </div>
             {data?.favicon_data_url && (
               <Button variant="ghost" size="sm" onClick={removeFavicon} disabled={saving}>

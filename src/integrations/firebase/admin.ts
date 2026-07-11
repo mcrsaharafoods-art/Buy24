@@ -9,18 +9,39 @@ if (!getApps().length) {
   let credential;
 
   try {
-    const localCertPath = path.resolve(process.cwd(), "firebase-service-account.json");
-    if (fs.existsSync(localCertPath)) {
-      const serviceAccount = JSON.parse(fs.readFileSync(localCertPath, "utf-8"));
+    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      credential = cert({
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      });
+      console.log("Initialized Firebase Admin using individual env vars.");
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       credential = cert(serviceAccount);
-      console.log("Initialized Firebase Admin using local service account JSON.");
+      console.log("Initialized Firebase Admin using FIREBASE_SERVICE_ACCOUNT env var.");
     } else {
-      credential = applicationDefault();
-      console.log("Initialized Firebase Admin using applicationDefault().");
+      const localCertPath = path.resolve(process.cwd(), "firebase-service-account.json");
+      if (fs.existsSync(localCertPath)) {
+        const serviceAccount = JSON.parse(fs.readFileSync(localCertPath, "utf-8"));
+        credential = cert(serviceAccount);
+        console.log("Initialized Firebase Admin using local service account JSON.");
+      } else {
+        console.warn(
+          "WARNING: No Firebase Admin credentials found! Falling back to applicationDefault().",
+        );
+        credential = applicationDefault();
+      }
     }
   } catch (error) {
-    console.error("Error loading Firebase credentials, falling back to applicationDefault():", error);
+    console.error("Error loading Firebase credentials:", error);
     credential = applicationDefault();
+  }
+
+  if (!process.env.VITE_FIREBASE_PROJECT_ID) {
+    throw new Error(
+      "FIREBASE ADMIN INIT ERROR: VITE_FIREBASE_PROJECT_ID is missing from environment variables.",
+    );
   }
 
   initializeApp({
@@ -28,6 +49,10 @@ if (!getApps().length) {
     projectId: process.env.VITE_FIREBASE_PROJECT_ID,
     storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
   });
+}
+
+if (!getApps().length) {
+  throw new Error("FIREBASE ADMIN INIT ERROR: Firebase Admin SDK failed to initialize.");
 }
 
 export const adminAuth = getAuth();

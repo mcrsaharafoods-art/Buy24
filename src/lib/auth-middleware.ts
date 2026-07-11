@@ -1,5 +1,5 @@
 import { createMiddleware } from "@tanstack/react-start";
-import { getCookie } from "vinxi/http";
+import { getCookie } from "@tanstack/react-start/server";
 import { adminAuth } from "@/integrations/firebase/admin";
 
 export const requireAuth = createMiddleware().server(async ({ next }) => {
