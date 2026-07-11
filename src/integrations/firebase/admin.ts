@@ -16,6 +16,7 @@ console.log("[FIREBASE] process.env.VITE_FIREBASE_PROJECT_ID exists?", !!process
 let adminAuth: any = null;
 let adminDb: any = null;
 let adminStorage: any = null;
+let adminInitializationError: Error | null = null;
 
 function normalizePrivateKey(value: string) {
   return value
@@ -59,9 +60,14 @@ if (!getApps().length) {
       });
       console.log("[FIREBASE] initializeApp SUCCESS");
     } else {
-      console.warn("[FIREBASE] WARNING: No credentials found! Exporting services as null.");
+      adminInitializationError = new Error(
+        "Missing FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, or FIREBASE_PRIVATE_KEY.",
+      );
+      console.error("[FIREBASE]", adminInitializationError.message);
     }
   } catch (error: any) {
+    adminInitializationError =
+      error instanceof Error ? error : new Error(String(error));
     console.error("[FIREBASE] initializeApp threw an error:", error.message);
     console.warn("[FIREBASE] WARNING: Exporting services as null due to initialization error.");
   }
@@ -84,4 +90,4 @@ console.log("[FIREBASE] adminDb is null?", adminDb === null);
 console.log("[FIREBASE] adminStorage is null?", adminStorage === null);
 console.log("[FIREBASE] Module init END");
 
-export { adminAuth, adminDb, adminStorage };
+export { adminAuth, adminDb, adminStorage, adminInitializationError };

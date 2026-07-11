@@ -1,13 +1,19 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { adminAuth, adminDb } from "@/integrations/firebase/admin";
+import {
+  adminAuth,
+  adminDb,
+  adminInitializationError,
+} from "@/integrations/firebase/admin";
 
 export const requireAuth = createMiddleware().server(async ({ next }) => {
   try {
     console.log("[MIDDLEWARE] Request received");
     
     if (!adminAuth || !adminDb) {
-      throw new Error("Firebase Admin SDK not initialized.");
+      throw new Error(
+        `Firebase Admin SDK not initialized: ${adminInitializationError?.message ?? "unknown initialization error"}`,
+      );
     }
 
     const token = getCookie("auth_token");
