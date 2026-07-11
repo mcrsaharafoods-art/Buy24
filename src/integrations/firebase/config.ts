@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -10,24 +10,21 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Defensive check to ensure API key is valid and not wrapped in literal quotes
-if (typeof window !== "undefined") {
-  if (!firebaseConfig.apiKey) {
-    throw new Error(
-      "FIREBASE INITIALIZATION FAILED: VITE_FIREBASE_API_KEY is missing from environment variables.",
-    );
-  }
-  if (firebaseConfig.apiKey.startsWith('"') || firebaseConfig.apiKey.endsWith('"')) {
-    throw new Error(
-      "FIREBASE INITIALIZATION FAILED: VITE_FIREBASE_API_KEY contains literal quotes. Please remove the quotes in your .env file.",
-    );
-  }
+const requiredConfig = {
+  apiKey: firebaseConfig.apiKey,
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  appId: firebaseConfig.appId,
+};
+
+const missingConfig = Object.entries(requiredConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missingConfig.length > 0) {
+  throw new Error(
+    `Firebase configuration is missing: ${missingConfig.join(", ")}`,
+  );
 }
 
-// Prevent Firebase initialization on the server-side during SSR
-export const app =
-  typeof window !== "undefined"
-    ? !getApps().length
-      ? initializeApp(firebaseConfig)
-      : getApp()
-    : (null as any);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);

@@ -17,10 +17,19 @@ let adminAuth: any = null;
 let adminDb: any = null;
 let adminStorage: any = null;
 
+function normalizePrivateKey(value: string) {
+  return value
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
 if (!getApps().length) {
   console.log("[FIREBASE] No apps found. Initializing...");
   let credential = null;
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY;
 
   try {
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
@@ -31,16 +40,12 @@ if (!getApps().length) {
       if (fs.existsSync(localCertPath)) {
         console.log("[FIREBASE] Using local firebase-service-account.json");
         credential = cert(JSON.parse(fs.readFileSync(localCertPath, "utf-8")));
-      } else if (
-        process.env.FIREBASE_PROJECT_ID &&
-        process.env.FIREBASE_CLIENT_EMAIL &&
-        process.env.FIREBASE_PRIVATE_KEY
-      ) {
+      } else if (projectId && clientEmail && privateKey) {
         console.log("[FIREBASE] Using individual FIREBASE_ env vars.");
         credential = cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+          projectId,
+          clientEmail,
+          privateKey: normalizePrivateKey(privateKey),
         });
       }
     }
