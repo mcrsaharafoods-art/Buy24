@@ -22,6 +22,9 @@ function decodeBase64(str: string): Buffer {
 export const submitApplication = createServerFn({ method: "POST" })
   .validator((input: SubmitApplicationInput) => submitApplicationSchema.parse(input))
   .handler(async ({ data }) => {
+    if (!adminAuth || !adminDb) {
+      throw new Error("Firebase Admin SDK not initialized.");
+    }
     // 1. Confirm OTP was verified (Ideally we check otpVerifications in Firestore)
     const otpSnap = await adminDb
       .collection(COLLECTIONS.OTP_VERIFICATIONS)
@@ -187,6 +190,9 @@ export const checkMobileAvailable = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
+    if (!adminAuth || !adminDb) {
+      throw new Error("Firebase Admin SDK not initialized.");
+    }
     const snap = await adminDb
       .collection(COLLECTIONS.USERS)
       .where("mobile", "==", data.mobile)

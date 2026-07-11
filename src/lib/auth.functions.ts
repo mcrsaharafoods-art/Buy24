@@ -6,8 +6,10 @@ export const createSession = createServerFn({ method: "POST" })
   .validator((input: { idToken: string }) => z.object({ idToken: z.string() }).parse(input))
   .handler(async ({ data }) => {
     try {
-      console.log("[createSession] Request received for idToken:", data.idToken.substring(0, 15) + "...");
-      console.log("[createSession] Calling setCookie...");
+      console.log(`[SERVER] createSession started`);
+      console.log(`[SERVER] Received idToken: ${data.idToken.substring(0, 15)}...`);
+      
+      console.log("[SERVER] Calling setCookie...");
       setCookie("auth_token", data.idToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -15,11 +17,15 @@ export const createSession = createServerFn({ method: "POST" })
         path: "/",
         sameSite: "lax",
       });
-      console.log("[createSession] Cookie created successfully.");
+      console.log("[SERVER] session cookie created");
+      console.log("[SERVER] cookie written");
+      
       return { success: true };
     } catch (e: any) {
-      console.error("[createSession] SERVER ERROR IN createSession:", e);
-      console.error("[createSession] Stack trace:", e.stack);
+      console.error("[SERVER] BOOTSTRAP ERROR THROWN ON SERVER");
+      console.error(`[SERVER] error.message: ${e.message}`);
+      console.error(`[SERVER] error.stack: ${e.stack}`);
+      console.error(`[SERVER] function name: createSession`);
       throw new Error(`[createSession] Failed: ${e.message}`);
     }
   });

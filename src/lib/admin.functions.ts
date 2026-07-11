@@ -5,6 +5,9 @@ import { adminDb, adminStorage, adminAuth } from "@/integrations/firebase/admin"
 import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 async function assertAdmin(userId: string) {
+  if (!adminAuth || !adminDb) {
+    throw new Error("Firebase Admin SDK not initialized.");
+  }
   const userSnap = await adminDb.collection(COLLECTIONS.USERS).doc(userId).get();
   if (!userSnap.exists || userSnap.data()?.role !== "admin") {
     throw new Error("Forbidden: Requires Admin role");
@@ -12,28 +15,32 @@ async function assertAdmin(userId: string) {
 }
 
 export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async () => {
-  // Mock bootstrap - create admin user if doesn't exist
   try {
-    console.log("[bootstrapAdmin] Starting bootstrap process...");
+    console.log("[SERVER] bootstrapAdmin started");
+    
+    if (!adminAuth || !adminDb) {
+      throw new Error("Firebase Admin SDK not initialized.");
+    }
+
     const adminEmail = "muneendra2you@gmail.com";
     let user;
     try {
-      console.log(`[bootstrapAdmin] Attempting to fetch user by email: ${adminEmail}`);
+      console.log(`[SERVER] Attempting to fetch user by email: ${adminEmail}`);
       user = await adminAuth.getUserByEmail(adminEmail);
-      console.log("[bootstrapAdmin] User found. ID:", user.uid);
+      console.log(`[SERVER] User found. ID: ${user.uid}`);
     } catch (fetchError: any) {
-      console.log("[bootstrapAdmin] User not found, creating new admin account...", fetchError.message);
+      console.log(`[SERVER] User not found, creating new admin account... (${fetchError.message})`);
       user = await adminAuth.createUser({
         email: adminEmail,
         password: "admin@1990",
         displayName: "Super Admin",
       });
-      console.log("[bootstrapAdmin] User created successfully. ID:", user.uid);
+      console.log(`[SERVER] User created successfully. ID: ${user.uid}`);
       
-      console.log("[bootstrapAdmin] Setting custom claims...");
+      console.log("[SERVER] Setting custom claims...");
       await adminAuth.setCustomUserClaims(user.uid, { role: "admin", isSuperAdmin: true });
       
-      console.log("[bootstrapAdmin] Writing to Firestore...");
+      console.log("[SERVER] Writing to Firestore...");
       await adminDb.collection(COLLECTIONS.USERS).doc(user.uid).set({
         id: user.uid,
         email: adminEmail,
@@ -43,13 +50,15 @@ export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async (
         full_name: "Super Admin",
         created_at: new Date().toISOString(),
       });
-      console.log("[bootstrapAdmin] Firestore document created successfully.");
+      console.log("[SERVER] Firestore document created successfully.");
     }
-    console.log("[bootstrapAdmin] Bootstrap process completed successfully.");
+    console.log("[SERVER] Bootstrap process completed successfully.");
     return { success: true };
   } catch (e: any) {
-    console.error("[bootstrapAdmin] BOOTSTRAP ERROR THROWN ON SERVER:", e);
-    console.error("[bootstrapAdmin] Stack trace:", e.stack);
+    console.error("[SERVER] BOOTSTRAP ERROR THROWN ON SERVER");
+    console.error(`[SERVER] error.message: ${e.message}`);
+    console.error(`[SERVER] error.stack: ${e.stack}`);
+    console.error(`[SERVER] function name: bootstrapAdmin`);
     throw new Error(`[bootstrapAdmin] Failed: ${e.message}`);
   }
 });
