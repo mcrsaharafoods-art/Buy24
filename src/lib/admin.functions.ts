@@ -14,17 +14,26 @@ async function assertAdmin(userId: string) {
 export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async () => {
   // Mock bootstrap - create admin user if doesn't exist
   try {
+    console.log("[bootstrapAdmin] Starting bootstrap process...");
     const adminEmail = "muneendra2you@gmail.com";
     let user;
     try {
+      console.log(`[bootstrapAdmin] Attempting to fetch user by email: ${adminEmail}`);
       user = await adminAuth.getUserByEmail(adminEmail);
-    } catch {
+      console.log("[bootstrapAdmin] User found. ID:", user.uid);
+    } catch (fetchError: any) {
+      console.log("[bootstrapAdmin] User not found, creating new admin account...", fetchError.message);
       user = await adminAuth.createUser({
         email: adminEmail,
         password: "admin@1990",
         displayName: "Super Admin",
       });
+      console.log("[bootstrapAdmin] User created successfully. ID:", user.uid);
+      
+      console.log("[bootstrapAdmin] Setting custom claims...");
       await adminAuth.setCustomUserClaims(user.uid, { role: "admin", isSuperAdmin: true });
+      
+      console.log("[bootstrapAdmin] Writing to Firestore...");
       await adminDb.collection(COLLECTIONS.USERS).doc(user.uid).set({
         id: user.uid,
         email: adminEmail,
@@ -34,11 +43,14 @@ export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async (
         full_name: "Super Admin",
         created_at: new Date().toISOString(),
       });
+      console.log("[bootstrapAdmin] Firestore document created successfully.");
     }
+    console.log("[bootstrapAdmin] Bootstrap process completed successfully.");
     return { success: true };
   } catch (e: any) {
-    console.error("BOOTSTRAP ERROR THROWN ON SERVER:", e);
-    throw new Error(e.message);
+    console.error("[bootstrapAdmin] BOOTSTRAP ERROR THROWN ON SERVER:", e);
+    console.error("[bootstrapAdmin] Stack trace:", e.stack);
+    throw new Error(`[bootstrapAdmin] Failed: ${e.message}`);
   }
 });
 
