@@ -6,7 +6,12 @@ import {
   REQUIRED_DOCUMENTS,
   mobileToVendorEmail,
 } from "./constants";
-import { adminDb, adminStorage, adminAuth } from "@/integrations/firebase/admin";
+import {
+  adminDb,
+  adminStorage,
+  adminAuth,
+  getAdminInitializationError,
+} from "@/integrations/firebase/admin";
 import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 function generateApplicationCode(): string {
@@ -23,7 +28,7 @@ export const submitApplication = createServerFn({ method: "POST" })
   .validator((input: SubmitApplicationInput) => submitApplicationSchema.parse(input))
   .handler(async ({ data }) => {
     if (!adminAuth || !adminDb) {
-      throw new Error("Firebase Admin SDK not initialized.");
+      throw new Error(getAdminInitializationError());
     }
     // 1. Confirm OTP was verified (Ideally we check otpVerifications in Firestore)
     const otpSnap = await adminDb
@@ -191,7 +196,7 @@ export const checkMobileAvailable = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     if (!adminAuth || !adminDb) {
-      throw new Error("Firebase Admin SDK not initialized.");
+      throw new Error(getAdminInitializationError());
     }
     const snap = await adminDb
       .collection(COLLECTIONS.USERS)

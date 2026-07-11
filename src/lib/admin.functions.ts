@@ -1,12 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireAuth } from "./auth-middleware";
-import { adminDb, adminStorage, adminAuth } from "@/integrations/firebase/admin";
+import {
+  adminDb,
+  adminStorage,
+  adminAuth,
+  getAdminInitializationError,
+} from "@/integrations/firebase/admin";
 import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 async function assertAdmin(userId: string) {
   if (!adminAuth || !adminDb) {
-    throw new Error("Firebase Admin SDK not initialized.");
+    throw new Error(getAdminInitializationError());
   }
   const userSnap = await adminDb.collection(COLLECTIONS.USERS).doc(userId).get();
   if (!userSnap.exists || userSnap.data()?.role !== "admin") {
@@ -19,7 +24,7 @@ export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async (
     console.log("[ADMIN] bootstrap START");
     
     if (!adminAuth || !adminDb) {
-      throw new Error("Firebase Admin SDK not initialized.");
+      throw new Error(getAdminInitializationError());
     }
 
     const adminEmail = "muneendra2you@gmail.com";

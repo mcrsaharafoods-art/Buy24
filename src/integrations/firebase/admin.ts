@@ -18,6 +18,10 @@ let adminDb: any = null;
 let adminStorage: any = null;
 let adminInitializationError: Error | null = null;
 
+export function getAdminInitializationError() {
+  return `Firebase Admin SDK not initialized: ${adminInitializationError?.message ?? "unknown initialization error"}`;
+}
+
 function normalizePrivateKey(value: string) {
   return value
     .trim()

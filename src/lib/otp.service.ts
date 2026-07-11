@@ -1,7 +1,11 @@
 /**
  * DEVELOPMENT OTP SERVICE
  */
-import { adminDb, adminAuth } from "@/integrations/firebase/admin";
+import {
+  adminDb,
+  adminAuth,
+  getAdminInitializationError,
+} from "@/integrations/firebase/admin";
 import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 export async function sendOtpMessage(mobile: string, code: string): Promise<void> {
@@ -11,7 +15,7 @@ export async function sendOtpMessage(mobile: string, code: string): Promise<void
 
 export async function generateOtp(mobile: string): Promise<string> {
   if (!adminAuth || !adminDb) {
-    throw new Error("Firebase Admin SDK not initialized.");
+    throw new Error(getAdminInitializationError());
   }
   const code = "123456";
   await adminDb.collection(COLLECTIONS.OTP_VERIFICATIONS).doc(mobile).set({
@@ -26,7 +30,7 @@ export async function generateOtp(mobile: string): Promise<string> {
 
 export async function verifyOtp(mobile: string, code: string): Promise<void> {
   if (!adminAuth || !adminDb) {
-    throw new Error("Firebase Admin SDK not initialized.");
+    throw new Error(getAdminInitializationError());
   }
   const snap = await adminDb.collection(COLLECTIONS.OTP_VERIFICATIONS).doc(mobile).get();
   if (!snap.exists || snap.data()?.code !== code) {
