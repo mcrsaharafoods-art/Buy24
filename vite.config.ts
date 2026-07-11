@@ -12,6 +12,14 @@ export default defineConfig({
         // @ts-expect-error - Preset is used by Vinxi/Nitro underneath but missing in TanStack Start types
         preset: "vercel",
       },
+      // Pass settings directly down to Vinxi's underlying Nitro configuration engine
+      deployment: {
+        nitro: {
+          externals: {
+            inline: ["firebase-admin"],
+          },
+        },
+      },
     }),
     viteReact(),
     tailwindcss(),
