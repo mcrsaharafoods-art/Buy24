@@ -6,10 +6,10 @@ export const createSession = createServerFn({ method: "POST" })
   .validator((input: { idToken: string }) => z.object({ idToken: z.string() }).parse(input))
   .handler(async ({ data }) => {
     try {
-      console.log(`[SERVER] createSession started`);
-      console.log(`[SERVER] Received idToken: ${data.idToken.substring(0, 15)}...`);
+      console.log("[AUTH] createSession START");
+      console.log("[AUTH] Received idToken");
       
-      console.log("[SERVER] Calling setCookie...");
+      console.log("[AUTH] setCookie START");
       setCookie("auth_token", data.idToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -17,20 +17,28 @@ export const createSession = createServerFn({ method: "POST" })
         path: "/",
         sameSite: "lax",
       });
-      console.log("[SERVER] session cookie created");
-      console.log("[SERVER] cookie written");
+      console.log("[AUTH] setCookie SUCCESS");
       
+      console.log("[AUTH] RETURN SUCCESS");
       return { success: true };
-    } catch (e: any) {
-      console.error("[SERVER] BOOTSTRAP ERROR THROWN ON SERVER");
-      console.error(`[SERVER] error.message: ${e.message}`);
-      console.error(`[SERVER] error.stack: ${e.stack}`);
-      console.error(`[SERVER] function name: createSession`);
-      throw new Error(`[createSession] Failed: ${e.message}`);
+    } catch (error: any) {
+      console.error("FUNCTION: createSession");
+      console.error("MESSAGE:", error?.message);
+      console.error("STACK:", error?.stack);
+      throw error;
     }
   });
 
 export const removeSession = createServerFn({ method: "POST" }).handler(async () => {
-  deleteCookie("auth_token", { path: "/" });
-  return { success: true };
+  try {
+    console.log("[AUTH] removeSession START");
+    deleteCookie("auth_token", { path: "/" });
+    console.log("[AUTH] removeSession SUCCESS");
+    return { success: true };
+  } catch (error: any) {
+    console.error("FUNCTION: removeSession");
+    console.error("MESSAGE:", error?.message);
+    console.error("STACK:", error?.stack);
+    throw error;
+  }
 });

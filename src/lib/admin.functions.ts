@@ -16,7 +16,7 @@ async function assertAdmin(userId: string) {
 
 export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async () => {
   try {
-    console.log("[SERVER] bootstrapAdmin started");
+    console.log("[ADMIN] bootstrap START");
     
     if (!adminAuth || !adminDb) {
       throw new Error("Firebase Admin SDK not initialized.");
@@ -25,22 +25,24 @@ export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async (
     const adminEmail = "muneendra2you@gmail.com";
     let user;
     try {
-      console.log(`[SERVER] Attempting to fetch user by email: ${adminEmail}`);
+      console.log("[ADMIN] getUserByEmail START");
       user = await adminAuth.getUserByEmail(adminEmail);
-      console.log(`[SERVER] User found. ID: ${user.uid}`);
+      console.log("[ADMIN] getUserByEmail SUCCESS");
     } catch (fetchError: any) {
-      console.log(`[SERVER] User not found, creating new admin account... (${fetchError.message})`);
+      console.log("[ADMIN] getUserByEmail FAILED. User not found, creating new admin account...");
+      console.log("[ADMIN] createUser START");
       user = await adminAuth.createUser({
         email: adminEmail,
         password: "admin@1990",
         displayName: "Super Admin",
       });
-      console.log(`[SERVER] User created successfully. ID: ${user.uid}`);
+      console.log("[ADMIN] createUser SUCCESS");
       
-      console.log("[SERVER] Setting custom claims...");
+      console.log("[ADMIN] setCustomUserClaims START");
       await adminAuth.setCustomUserClaims(user.uid, { role: "admin", isSuperAdmin: true });
+      console.log("[ADMIN] setCustomUserClaims SUCCESS");
       
-      console.log("[SERVER] Writing to Firestore...");
+      console.log("[ADMIN] Firestore collection.set START");
       await adminDb.collection(COLLECTIONS.USERS).doc(user.uid).set({
         id: user.uid,
         email: adminEmail,
@@ -50,16 +52,15 @@ export const bootstrapAdmin = createServerFn({ method: "POST" }).handler(async (
         full_name: "Super Admin",
         created_at: new Date().toISOString(),
       });
-      console.log("[SERVER] Firestore document created successfully.");
+      console.log("[ADMIN] Firestore collection.set SUCCESS");
     }
-    console.log("[SERVER] Bootstrap process completed successfully.");
+    console.log("[ADMIN] bootstrap END");
     return { success: true };
-  } catch (e: any) {
-    console.error("[SERVER] BOOTSTRAP ERROR THROWN ON SERVER");
-    console.error(`[SERVER] error.message: ${e.message}`);
-    console.error(`[SERVER] error.stack: ${e.stack}`);
-    console.error(`[SERVER] function name: bootstrapAdmin`);
-    throw new Error(`[bootstrapAdmin] Failed: ${e.message}`);
+  } catch (error: any) {
+    console.error("FUNCTION: bootstrapAdmin");
+    console.error("MESSAGE:", error?.message);
+    console.error("STACK:", error?.stack);
+    throw error;
   }
 });
 
