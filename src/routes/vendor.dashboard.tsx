@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Loader2, Plus, Edit, Trash, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,10 +59,7 @@ function VendorDashboard() {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return navigate({ to: "/login" });
+      // Fetch data using server functions
       setReady(true);
     })();
   }, [navigate]);
@@ -125,17 +122,14 @@ function VendorDashboard() {
     const newImages: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error(`File ${file.name} is too large. Max 2MB.`);
+      if (file.size > 1024 * 1024) {
+        toast.error("File size must be less than or equal to 1 MB.");
         continue;
       }
-      const b64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result));
-        r.onerror = () => reject(r.error);
-        r.readAsDataURL(file);
-      });
-      newImages.push(b64);
+      
+      // TEMPORARY: Save local preview/reference to bypass missing Firebase Storage
+      const localRef = URL.createObjectURL(file);
+      newImages.push(localRef);
     }
     setFormData((prev) => ({ ...prev, images: [...prev.images, ...newImages] }));
   }
@@ -298,16 +292,19 @@ function VendorDashboard() {
                       </button>
                     </div>
                   ))}
-                  <label className="h-16 w-16 flex items-center justify-center rounded-md border border-dashed cursor-pointer hover:bg-muted">
-                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImagesChange}
-                    />
-                  </label>
+                  <div className="flex flex-col items-center">
+                    <label className="h-16 w-16 flex items-center justify-center rounded-md border border-dashed cursor-pointer hover:bg-muted">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImagesChange}
+                      />
+                    </label>
+                    <span className="mt-1 text-[11px] text-muted-foreground text-center">Upload image<br/>(Maximum size: 1 MB)</span>
+                  </div>
                 </div>
               </div>
 

@@ -1,61 +1,36 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "./auth-middleware";
+import { adminDb, adminStorage } from "@/integrations/firebase/admin";
+import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 export const getVendorProducts = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async ({ context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Must be approved vendor to fetch their products
-    const { data: appData } = await supabaseAdmin
-      .from("vendor_applications")
-      .select("status")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-
-    if (appData?.status !== "approved") {
-      throw new Error("Only approved vendors can access products.");
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .eq("vendor_id", context.userId)
-      .order("created_at", { ascending: false });
-
-    if (error) throw new Error(error.message);
-    return data;
+    const snap = await adminDb
+      .collection(COLLECTIONS.PRODUCTS)
+      .where("vendor_id", "==", context.userId)
+      .get();
+    return snap.docs.map((d: any) => d.data());
   });
 
 export const getVendorProductsAdmin = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((input: { vendorId: string }) =>
-    z.object({ vendorId: z.string().uuid() }).parse(input),
-  )
+  .middleware([requireAuth])
+  .validator((input: { vendorId: string }) => z.object({ vendorId: z.string() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Assert Admin (ideally shared from admin.functions, but doing a quick check)
+    const userSnap = await adminDb.collection(COLLECTIONS.USERS).doc(context.userId).get();
+    if (userSnap.data()?.role !== "admin") throw new Error("Forbidden");
 
-    const { data: role } = await supabaseAdmin
-      .from("user_roles")
-      .select("id")
-      .eq("user_id", context.userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    if (!role) throw new Error("Forbidden: admin only");
-
-    const { data: products, error } = await supabaseAdmin
-      .from("products")
-      .select("*")
-      .eq("vendor_id", data.vendorId)
-      .order("created_at", { ascending: false });
-
-    if (error) throw new Error(error.message);
-    return products;
+    const snap = await adminDb
+      .collection(COLLECTIONS.PRODUCTS)
+      .where("vendor_id", "==", data.vendorId)
+      .get();
+    return snap.docs.map((d: any) => d.data());
   });
 
 const ProductInputSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   name: z.string().min(1),
   category: z.string().min(1),
   description: z.string(),
@@ -68,47 +43,38 @@ const ProductInputSchema = z.object({
 });
 
 export const saveProduct = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .validator((input: z.infer<typeof ProductInputSchema>) => ProductInputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bucket = adminStorage.bucket();
+    const uploadedImages = [];
 
-    // Verify vendor
-    const { data: appData } = await supabaseAdmin
-      .from("vendor_applications")
-      .select("status")
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (appData?.status !== "approved") throw new Error("Not authorized");
-
-    const imageUrls: string[] = [];
-
-    // Upload base64 images
     for (let i = 0; i < data.images.length; i++) {
       const img = data.images[i];
-      if (img.startsWith("data:image")) {
-        const mime = img.substring(img.indexOf(":") + 1, img.indexOf(";"));
-        const ext = mime.split("/")[1] || "png";
-        const base64Data = img.split(",")[1];
-        const bytes = Buffer.from(base64Data, "base64");
-        const path = `${context.userId}/${Date.now()}-${i}.${ext}`;
-
-        const { error: upErr } = await supabaseAdmin.storage
-          .from("vendor-products")
-          .upload(path, bytes, { contentType: mime, upsert: true });
-
-        if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
-
-        const { data: urlData } = supabaseAdmin.storage.from("vendor-products").getPublicUrl(path);
-        imageUrls.push(urlData.publicUrl);
+      if (img.startsWith("data:") || img.startsWith("blob:")) {
+        // TEMPORARY: bypass real Firebase Storage. Store local preview reference.
+        // When Firebase Storage is enabled, restore the code below:
+        /*
+        const match = img.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+        if (match) {
+          const mimeType = match[1];
+          const base64Data = match[2];
+          const buffer = Buffer.from(base64Data, "base64");
+          const ext = mimeType.split("/")[1] || "png";
+          const fileName = `products/${context.userId}/${Date.now()}-${i}.${ext}`;
+          const file = bucket.file(fileName);
+          await file.save(buffer, { contentType: mimeType });
+          await file.makePublic(); // Assuming public products
+          uploadedImages.push(file.publicUrl());
+        }
+        */
+        uploadedImages.push(img);
       } else {
-        // existing url
-        imageUrls.push(img);
+        uploadedImages.push(img);
       }
     }
 
-    const payload = {
-      vendor_id: context.userId,
+    const productData = {
       name: data.name,
       category: data.category,
       description: data.description,
@@ -117,37 +83,43 @@ export const saveProduct = createServerFn({ method: "POST" })
       stock: data.stock,
       unit: data.unit,
       is_active: data.is_active,
-      images: imageUrls,
+      images: uploadedImages,
+      vendor_id: context.userId,
+      is_temporary: true, // TEMPORARY FLAG
       updated_at: new Date().toISOString(),
     };
 
     if (data.id) {
-      // Update
-      const { error } = await supabaseAdmin
-        .from("products")
-        .update(payload)
-        .eq("id", data.id)
-        .eq("vendor_id", context.userId);
-      if (error) throw new Error(error.message);
+      // Verify ownership
+      const pSnap = await adminDb.collection(COLLECTIONS.PRODUCTS).doc(data.id).get();
+      if (!pSnap.exists || pSnap.data()?.vendor_id !== context.userId) {
+        throw new Error("Forbidden");
+      }
+      await adminDb.collection(COLLECTIONS.PRODUCTS).doc(data.id).update(productData);
     } else {
-      // Create
-      const { error } = await supabaseAdmin.from("products").insert(payload);
-      if (error) throw new Error(error.message);
+      const newRef = adminDb.collection(COLLECTIONS.PRODUCTS).doc();
+      await newRef.set({
+        ...productData,
+        id: newRef.id,
+        created_at: new Date().toISOString(),
+      });
     }
 
     return { success: true };
   });
 
 export const deleteProduct = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((input: { id: string }) => z.object({ id: z.string().uuid() }).parse(input))
+  .middleware([requireAuth])
+  .validator((input: { id: string }) => z.object({ id: z.string() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("products")
-      .delete()
-      .eq("id", data.id)
-      .eq("vendor_id", context.userId);
-    if (error) throw new Error(error.message);
+    const pSnap = await adminDb.collection(COLLECTIONS.PRODUCTS).doc(data.id).get();
+    if (!pSnap.exists) return { success: true };
+    if (pSnap.data()?.vendor_id !== context.userId) {
+      throw new Error("Forbidden");
+    }
+
+    // Optional: Delete images from storage here
+
+    await adminDb.collection(COLLECTIONS.PRODUCTS).doc(data.id).delete();
     return { success: true };
   });

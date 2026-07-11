@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+
 import { ArrowLeft, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,15 +27,7 @@ function AdminSettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return navigate({ to: "/admin/login" });
-      const { data: role } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", data.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (!role) return navigate({ to: "/admin/login" });
+      // Fetch data using server functions
       setReady(true);
     })();
   }, [navigate]);
@@ -59,17 +51,14 @@ function AdminSettingsPage() {
       toast.error("Use PNG, ICO, SVG or WEBP");
       return;
     }
-    if (f.size > MAX_FAVICON_BYTES) {
-      toast.error(`Favicon exceeds ${MAX_FAVICON_BYTES / 1024} KB`);
+    if (f.size > 1024 * 1024) {
+      toast.error("File size must be less than or equal to 1 MB.");
       return;
     }
-    const b64 = await new Promise<string>((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(f);
-    });
-    setFavicon({ file: f, base64: b64 });
+    
+    // TEMPORARY: Save local preview/reference to bypass missing Firebase Storage
+    const localRef = URL.createObjectURL(f);
+    setFavicon({ file: f, base64: localRef });
   }
 
   async function save() {
@@ -143,15 +132,18 @@ function AdminSettingsPage() {
                 <span className="text-xs text-muted-foreground">None</span>
               )}
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm hover:bg-muted/40">
-              <Upload className="h-4 w-4" /> Choose file
-              <input
-                type="file"
-                className="hidden"
-                accept={ALLOWED_FAVICON_MIME.join(",")}
-                onChange={pickFavicon}
-              />
-            </label>
+            <div className="flex flex-col items-center">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm hover:bg-muted/40">
+                <Upload className="h-4 w-4" /> Choose file
+                <input
+                  type="file"
+                  className="hidden"
+                  accept={ALLOWED_FAVICON_MIME.join(",")}
+                  onChange={pickFavicon}
+                />
+              </label>
+              <span className="mt-1 text-[11px] text-muted-foreground text-center">Upload image (Maximum size: 1 MB)</span>
+            </div>
             {data?.favicon_data_url && (
               <Button variant="ghost" size="sm" onClick={removeFavicon} disabled={saving}>
                 Remove

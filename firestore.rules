@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    function isVendor() {
+      return isAuthenticated() && getUserRole() == 'vendor';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rules per collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    match /vendorApplications/{appId} {
+      // Vendors can read/write their own applications. Admins can read/write all.
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      // Anyone can read active products (or we can just say read is public for active, but admin/vendor for all)
+      allow read: if true;
+      allow create, update: if isAdmin() || (isVendor() && request.resource.data.vendor_id == request.auth.uid);
+      allow delete: if isAdmin() || (isVendor() && resource.data.vendor_id == request.auth.uid);
+    }
+    
+    match /settings/{docId} {
+      allow read: if true; // Public settings like terms, privacy, favicon
+      allow write: if isAdmin();
+    }
+    
+    match /categories/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin() || isOwner(resource.data.customer_id) || isOwner(resource.data.vendor_id);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || isOwner(resource.data.customer_id) || isOwner(resource.data.vendor_id);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+      allow write: if isAdmin();
+    }
+    
+    match /analytics/{docId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

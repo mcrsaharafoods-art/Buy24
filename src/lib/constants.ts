@@ -13,7 +13,7 @@ export const ADMIN_PASSWORD = "Buy24Us@Admin#2026";
 
 /**
  * Vendor accounts do not need a real email. When the vendor omits email
- * we synthesize one from the verified mobile number so Supabase Auth has
+ * we synthesize one from the verified mobile number so Firebase Auth has
  * a unique identifier. Vendors sign in with the same mobile + password.
  */
 export const VENDOR_EMAIL_DOMAIN = "vendor.buy24us.app";

@@ -1,15 +1,19 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/constants";
 import { LogOut } from "lucide-react";
 import { getPublicSettings } from "@/lib/settings.functions";
+import { auth } from "@/integrations/firebase/auth";
+import { useServerFn } from "@tanstack/react-start";
+import { removeSession } from "@/lib/auth.functions";
 
 export function SiteHeader() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const removeAuthSession = useServerFn(removeSession);
 
   const { data: settings } = useQuery({
     queryKey: ["public-settings"],
@@ -18,18 +22,15 @@ export function SiteHeader() {
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        setEmail(session?.user?.email ?? null);
-        router.invalidate();
-      }
+    const unsubscribe = auth.onAuthStateChanged((user: any) => {
+      setEmail(user?.email ?? null);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => unsubscribe();
   }, [router]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await auth.signOut();
+    await removeAuthSession();
     router.navigate({ to: "/", replace: true });
   }
 

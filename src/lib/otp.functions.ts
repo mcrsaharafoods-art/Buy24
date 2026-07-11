@@ -12,7 +12,7 @@ export const sendOtp = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const isDev = isDevMode();
     if (isDev) {
-      // DEVELOPMENT ONLY: Temporary fallback for missing Twilio / Supabase keys
+      // DEVELOPMENT ONLY: Temporary fallback for missing Twilio / Firebase keys
       return {
         success: true,
         devOtp: "123456", // Padded to 6 digits to pass UI length validation

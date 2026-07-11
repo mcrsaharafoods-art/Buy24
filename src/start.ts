@@ -2,7 +2,6 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 import { createCsrfMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -22,11 +21,11 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => {
     const url = new URL(ctx.request.url);
+    // Protect only Server Functions. They use the /_server route by default.
     return url.pathname.startsWith("/_server");
   },
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [csrfMiddleware, errorMiddleware],
+  requestMiddleware: [errorMiddleware, csrfMiddleware as any],
 }));

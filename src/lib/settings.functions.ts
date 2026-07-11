@@ -1,26 +1,28 @@
-/**
- * Public read for site-wide settings (favicon + support email).
- * Uses the publishable-key server client and the `Anyone can read settings`
- * RLS policy.
- */
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import { adminDb } from "@/integrations/firebase/admin";
+import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 export const getPublicSettings = createServerFn({ method: "GET" }).handler(async () => {
-  const supabase = createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-  const { data, error } = await supabase
-    .from("system_settings")
-    .select("support_email, favicon_data_url")
-    .eq("id", 1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
+  const snap = await adminDb.collection(COLLECTIONS.SETTINGS).doc("global").get();
+
+  if (snap.exists) {
+    const data = snap.data()!;
+    return {
+      support_email: data.support_email || "support@buy24us.com",
+      favicon_data_url: data.favicon_data_url || null,
+      android_link: data.android_link || "",
+      ios_link: data.ios_link || "",
+      terms_content: data.terms_content || "",
+      privacy_content: data.privacy_content || "",
+    };
+  }
+
   return {
-    support_email: data?.support_email ?? "support@buy24us.com",
-    favicon_data_url: data?.favicon_data_url ?? null,
+    support_email: "support@buy24us.com",
+    favicon_data_url: null,
+    android_link: "",
+    ios_link: "",
+    terms_content: "",
+    privacy_content: "",
   };
 });

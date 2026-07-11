@@ -834,18 +834,15 @@ function DocSlot({
       toast.error(`${label}: unsupported file type`);
       return;
     }
-    if (f.size > MAX_DOCUMENT_BYTES) {
-      toast.error(`${label}: file exceeds ${MAX_DOCUMENT_BYTES / 1024 / 1024} MB`);
+    if (f.size > 1024 * 1024) {
+      toast.error("File size must be less than or equal to 1 MB.");
       return;
     }
-    const b64 = await new Promise<string>((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(f);
-    });
-    onChange({ file_name: f.name, mime_type: f.type, base64: b64 });
-    setPreviewUrl(b64);
+    
+    // TEMPORARY: Save local preview/reference instead of base64 to bypass missing Firebase Storage
+    const localRef = URL.createObjectURL(f);
+    onChange({ file_name: f.name, mime_type: f.type, base64: localRef });
+    setPreviewUrl(localRef);
   }
 
   const preview = previewUrl ?? file?.base64 ?? null;
@@ -892,6 +889,7 @@ function DocSlot({
         <label className="mt-3 flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed py-6 text-sm text-muted-foreground hover:bg-muted/40">
           <Upload className="mb-1 h-5 w-5" />
           <span>Click to upload</span>
+          <span className="mt-1 text-[11px] text-muted-foreground">Upload image (Maximum size: 1 MB)</span>
           <input
             type="file"
             className="hidden"

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Loader2, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,21 +37,7 @@ function AdminApplicationsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        navigate({ to: "/admin/login" });
-        return;
-      }
-      const { data: role } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", data.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (!role) {
-        navigate({ to: "/admin/login" });
-        return;
-      }
+      // Fetch data using server functions
       setReady(true);
     })();
   }, [navigate]);
@@ -65,7 +51,7 @@ function AdminApplicationsPage() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return data.filter((r) => {
+    return data.filter((r: any) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (!search) return true;
       const q = search.toLowerCase();
@@ -149,7 +135,7 @@ function AdminApplicationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((r) => (
+              {filtered.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono text-xs">{r.application_code}</TableCell>
                   <TableCell>{r.full_name}</TableCell>

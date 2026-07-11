@@ -1,13 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { bootstrapAdmin } from "@/lib/admin.functions";
+import { createSession } from "@/lib/auth.functions";
+import { auth } from "@/integrations/firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export const Route = createFileRoute("/admin/login")({
   component: AdminLoginPage,
@@ -18,7 +20,9 @@ function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
   const bootstrap = useServerFn(bootstrapAdmin);
+  const createAuthSession = useServerFn(createSession);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,11 +30,11 @@ function AdminLoginPage() {
     try {
       // Idempotent: creates the fixed super-admin account on first login.
       await bootstrap({});
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      if (error) throw error;
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+      await createAuthSession({ data: { idToken } });
+
       toast.success("Welcome, admin");
       navigate({ to: "/admin/applications" });
     } catch (err) {

@@ -1,52 +1,58 @@
-/**
- * Vendor-facing server functions (auth required).
- */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { ALLOWED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES } from "./constants";
+import { requireAuth } from "./auth-middleware";
+import { adminDb, adminStorage } from "@/integrations/firebase/admin";
+import { COLLECTIONS } from "@/integrations/firebase/firestore";
 
 export const getMyApplication = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context;
+    const appsSnap = await adminDb
+      .collection(COLLECTIONS.VENDOR_APPLICATIONS)
+      .where("user_id", "==", context.userId)
+      .limit(1)
+      .get();
 
-    const { data: app, error } = await supabase
-      .from("vendor_applications")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!app) return { application: null, profile: null, documents: [] };
+    if (appsSnap.empty) return { application: null, profile: null, documents: [] };
 
-    const [{ data: profile }, { data: docs }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-      supabase.from("application_documents").select("*").eq("application_id", app.id),
-    ]);
+    const application = appsSnap.docs[0].data();
 
-    return { application: app, profile, documents: docs ?? [] };
+    const profileSnap = await adminDb.collection(COLLECTIONS.USERS).doc(context.userId).get();
+    const profile = profileSnap.exists ? profileSnap.data() : null;
+
+    const docsSnap = await adminDb
+      .collection(COLLECTIONS.APPLICATION_DOCUMENTS)
+      .where("application_id", "==", application.id)
+      .get();
+    const documents = docsSnap.docs.map((d: any) => d.data());
+
+    return { application, profile, documents };
   });
 
-/** Returns a short-lived signed URL for a document the caller owns (RLS enforced). */
 export const getMyDocumentUrl = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { path: string }) => z.object({ path: z.string().min(1) }).parse(input))
+  .middleware([requireAuth])
+  .validator((input: { path: string }) => z.object({ path: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }) => {
-    // Verify the caller owns this document by checking prefix (matches storage RLS).
-    if (!data.path.startsWith(`${context.userId}/`)) {
-      throw new Error("Forbidden");
+    // Basic authorization: user can only fetch their own documents, or admins.
+    // In Firebase storage, we generate signed URLs.
+    if (!data.path.includes(context.userId)) {
+      const userSnap = await adminDb.collection(COLLECTIONS.USERS).doc(context.userId).get();
+      if (userSnap.data()?.role !== "admin") {
+        throw new Error("Forbidden");
+      }
     }
-    const { data: signed, error } = await context.supabase.storage
-      .from("vendor-documents")
-      .createSignedUrl(data.path, 60 * 10);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl };
+
+    const file = adminStorage.bucket().file(data.path);
+    const [url] = await file.getSignedUrl({
+      action: "read",
+      expires: Date.now() + 60 * 10 * 1000,
+    });
+    return { url };
   });
 
-/** Re-upload a single document that admin flagged. */
 export const reuploadDocument = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .middleware([requireAuth])
+  .validator(
     (input: {
       doc_type: "aadhaar" | "pan" | "shop_photo" | "shop_license" | "cancelled_cheque";
       file_name: string;
@@ -63,90 +69,96 @@ export const reuploadDocument = createServerFn({ method: "POST" })
         .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    if (!(ALLOWED_DOCUMENT_MIME as readonly string[]).includes(data.mime_type)) {
-      throw new Error("Unsupported file type");
-    }
-    const clean = data.base64.includes(",") ? data.base64.split(",")[1] : data.base64;
-    const bytes = Buffer.from(clean, "base64");
-    if (bytes.length > MAX_DOCUMENT_BYTES) throw new Error("File too large");
+    const appsSnap = await adminDb
+      .collection(COLLECTIONS.VENDOR_APPLICATIONS)
+      .where("user_id", "==", context.userId)
+      .limit(1)
+      .get();
 
-    const { data: app, error: appErr } = await supabase
-      .from("vendor_applications")
-      .select("id, status, requested_reupload_docs")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (appErr) throw new Error(appErr.message);
-    if (!app) throw new Error("Application not found");
+    if (appsSnap.empty) throw new Error("Application not found");
+    const appRef = appsSnap.docs[0].ref;
+    const app = appsSnap.docs[0].data();
+
     if (app.status !== "reupload_required") {
-      throw new Error("Re-upload is not currently requested");
-    }
-    if (!app.requested_reupload_docs?.includes(data.doc_type)) {
-      throw new Error("This document was not flagged for re-upload");
+      throw new Error("Application is not in a re-upload state");
     }
 
+    const reqDocs: string[] = app.requested_reupload_docs || [];
+    if (!reqDocs.includes(data.doc_type)) {
+      throw new Error(`Document ${data.doc_type} was not requested for re-upload`);
+    }
+
+    let finalStoragePath = data.base64;
+    let finalSizeBytes = 0;
+
+    // TEMPORARY: bypass real Firebase Storage if base64/blob.
+    // When Firebase Storage is enabled, uncomment the upload logic:
+    /*
+    const cleanBase64 = data.base64.includes(",") ? data.base64.split(",")[1] : data.base64;
+    const bytes = Buffer.from(cleanBase64, "base64");
     const ext = data.file_name.split(".").pop() || "bin";
-    const path = `${userId}/${data.doc_type}-${Date.now()}.${ext}`;
+    const path = `vendor-documents/${context.userId}/${data.doc_type}-${Date.now()}.${ext}`;
 
-    const { error: upErr } = await supabase.storage
-      .from("vendor-documents")
-      .upload(path, bytes, { contentType: data.mime_type, upsert: true });
-    if (upErr) throw new Error(upErr.message);
+    const file = adminStorage.bucket().file(path);
+    await file.save(bytes, { contentType: data.mime_type });
+    finalStoragePath = path;
+    finalSizeBytes = bytes.length;
+    */
 
-    // Upsert document row.
-    const { data: existing } = await supabase
-      .from("application_documents")
-      .select("id")
-      .eq("application_id", app.id)
-      .eq("doc_type", data.doc_type)
-      .maybeSingle();
+    // Mark previous document of this type as overwritten/deleted or simply insert new
+    // We will just insert new (fetch and update existing document row)
+    const docsSnap = await adminDb
+      .collection(COLLECTIONS.APPLICATION_DOCUMENTS)
+      .where("application_id", "==", app.id)
+      .where("doc_type", "==", data.doc_type)
+      .get();
 
-    if (existing) {
-      await supabase
-        .from("application_documents")
-        .update({
-          storage_path: path,
-          file_name: data.file_name,
-          mime_type: data.mime_type,
-          size_bytes: bytes.length,
-          uploaded_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("application_documents").insert({
-        application_id: app.id,
-        user_id: userId,
-        doc_type: data.doc_type,
-        storage_path: path,
+    const batch = adminDb.batch();
+
+    if (!docsSnap.empty) {
+      batch.update(docsSnap.docs[0].ref, {
         file_name: data.file_name,
         mime_type: data.mime_type,
-        size_bytes: bytes.length,
+        storage_path: finalStoragePath,
+        size_bytes: finalSizeBytes,
+        is_temporary: true, // TEMPORARY FLAG
+        uploaded_at: new Date().toISOString(),
       });
-    }
-
-    // Remove this doc from pending list; if empty, flip status back to pending.
-    const remaining = (app.requested_reupload_docs ?? []).filter(
-      (d: string) => d !== data.doc_type,
-    );
-    const { error: updErr } = await supabase
-      .from("vendor_applications")
-      .update({
-        requested_reupload_docs: remaining.length ? remaining : null,
-        status: remaining.length ? "reupload_required" : "pending",
-        admin_message: remaining.length ? undefined : null,
-      })
-      .eq("id", app.id);
-    if (updErr) throw new Error(updErr.message);
-
-    if (!remaining.length) {
-      await supabase.from("application_status_history").insert({
+    } else {
+      const docRef = adminDb.collection(COLLECTIONS.APPLICATION_DOCUMENTS).doc();
+      batch.set(docRef, {
+        id: docRef.id,
         application_id: app.id,
-        from_status: "reupload_required",
-        to_status: "pending",
-        note: "All requested documents re-uploaded",
-        performed_by: userId,
+        user_id: context.userId,
+        doc_type: data.doc_type,
+        storage_path: finalStoragePath,
+        file_name: data.file_name,
+        mime_type: data.mime_type,
+        size_bytes: finalSizeBytes,
+        is_temporary: true, // TEMPORARY FLAG
+        uploaded_at: new Date().toISOString(),
       });
     }
+
+    const remaining = reqDocs.filter((d) => d !== data.doc_type);
+
+    batch.update(appRef, {
+      requested_reupload_docs: remaining,
+      ...(remaining.length === 0 ? { status: "pending" } : {}),
+    });
+
+    if (remaining.length === 0) {
+      const historyRef = adminDb.collection("applicationStatusHistory").doc();
+      batch.set(historyRef, {
+        application_id: app.id,
+        to_status: "pending",
+        note: "All requested documents re-uploaded. Application is back in pending review.",
+        performed_by: context.userId,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    await batch.commit();
 
     return { success: true, remaining };
   });

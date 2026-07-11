@@ -1,12 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { mobileToVendorEmail, APP_NAME } from "@/lib/constants";
+import { useServerFn } from "@tanstack/react-start";
+import { createSession } from "@/lib/auth.functions";
+import { auth } from "@/integrations/firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -17,6 +20,7 @@ function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const createAuthSession = useServerFn(createSession);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,28 +32,19 @@ function LoginPage() {
     const email = isMobile
       ? mobileToVendorEmail(identifier.trim())
       : identifier.trim().toLowerCase();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const idToken = await userCredential.user.getIdToken();
+      await createAuthSession({ data: { idToken } });
+
+      toast.success("Signed in");
+      navigate({ to: "/vendor/status" });
+    } catch (err: any) {
+      toast.error(err.message || "Error signing in");
+    } finally {
+      setLoading(false);
     }
-    toast.success("Signed in");
-
-    if (data.user) {
-      const { data: appData } = await supabase
-        .from("vendor_applications")
-        .select("status")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (appData?.status === "approved") {
-        navigate({ to: "/vendor/dashboard" });
-        return;
-      }
-    }
-
-    navigate({ to: "/vendor/status" });
   }
 
   return (

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,15 +41,7 @@ function AdminApplicationDetailPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return navigate({ to: "/admin/login" });
-      const { data: role } = await supabase
-        .from("user_roles")
-        .select("id")
-        .eq("user_id", data.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (!role) return navigate({ to: "/admin/login" });
+      // Fetch data using server functions
       setReady(true);
     })();
   }, [navigate]);
@@ -223,7 +215,7 @@ function AdminApplicationDetailPage() {
 
           <DetailBlock title="Documents">
             <div className="col-span-2 grid gap-3 sm:grid-cols-2">
-              {documents.map((d) => (
+              {documents.map((d: any) => (
                 <AdminDocRow
                   key={d.id}
                   docType={d.doc_type as DocType}
@@ -294,7 +286,7 @@ function AdminApplicationDetailPage() {
           <div className="rounded-[22px] border bg-white p-5 shadow-[var(--shadow-card)]">
             <div className="text-sm font-medium">History</div>
             <ol className="mt-3 space-y-3">
-              {history.map((h) => (
+              {history.map((h: any) => (
                 <li key={h.id} className="text-sm">
                   <div className="font-medium capitalize">{h.to_status.replace("_", " ")}</div>
                   {h.note && <div className="text-xs text-muted-foreground">{h.note}</div>}
